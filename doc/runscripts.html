@@ -1,0 +1,693 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+<head>
+<title>runit - collection of run scripts</title>
+</head>
+<body>
+<a href="http://smarden.org/pape/">G. Pape</a><br>
+<a href="index.html">runit</a><br>
+<a href="replaceinit.html">How to replace init</a>
+<hr>
+<h1>runit - collection of run scripts</h1>
+<hr>
+This is a collection of <tt>run</tt> scripts for popular services to have
+them monitored by the
+<a href="http://cr.yp.to/daemontools.html">daemontools</a> or
+<a href="http://smarden.org/runit/">runit</a> package.
+If you have additional run scripts or one of these run scripts works for you on
+an operating system not stated here, please
+<a href="mailto:pape-runscripts@smarden.org">let me know</a>. 
+<p>
+Thanks go to the following people for contributing run scripts:
+Alessandro Bono, Robin S. Socha, Claus Alboege, Paul Jarc, clemens fischer,
+Jesse Cablek, Lukas Beeler, Thomas Baden, Ralf Hildebrandt, Antonio Dias,
+Erich Schubert, Lang Martin, Tomasz Nidecki, Marek Bartnikowski,
+Thomas Schwinge.
+<hr>
+<a href="#atftpd">atftpd</a><br>
+<a href="#apache">apache</a><br>
+<a href="#apache2">apache2</a><br>
+<a href="#bind9">bind9</a><br>
+<a href="#boa">boa</a><br>
+<a href="#cfengine">cfengine</a><br>
+<a href="#clamav">clamav</a><br>
+<a href="#courier-imap">courier-imap</a></br>
+<a href="#cups">cups</a><br>
+<a href="#dhclient">dhclient</a><br>
+<a href="#dhcpcd">dhcpcd</a><br>
+<a href="#dhcpd">dhcpd</a><br>
+<a href="#expireproctitle">expireproctitle</a><br>
+<a href="#fam">fam</a><br>
+<a href="#gdm">gdm</a><br>
+<a href="#getty">getty</a><br>
+<a href="#identd">identd</a><br>
+<a href="#inn">inn</a><br>
+<a href="#jabberd">jabberd</a><br>
+<a href="#klogd">klogd</a><br>
+<a href="#leafnode">leafnode</a><br>
+<a href="#loglinuxkernel">logging Linux kernel messages</a><br>
+<a href="http://multivac.cwru.edu./fdtools/grabconsole/">
+logging console messages</a><br>
+<a href="#minidentd">minidentd</a><br>
+<a href="#mysql">mysql</a><br>
+<a href="#ntpd">ntpd</a><br>
+<a href="#polipo">polipo</a><br>
+<a href="#pop3-ssl">pop3-ssl</a><br>
+<a href="#pop3vscan">pop3vscan</a><br>
+<a href="#postgresql">postgresql</a><br>
+<a href="#ppp">ppp</a><br>
+<a href="#proftpd">proftpd</a><br>
+<a href="#pure-ftpd">pure-ftpd</a><br>
+<a href="#radiusd">radiusd</a><br>
+<a href="#rsyncd">rsyncd</a><br>
+<a href="#samba">samba (smbd, nmbd)</a><br>
+<a href="#shoutcast">shoutcast</a><br>
+<a href="#squid">squid</a><br>
+<a href="#sshd">sshd</a><br>
+<a href="#sshdtcpserver">sshd under tcpserver</a><br>
+<a href="#statd">statd</a>, <a href="#mountd">mountd</a><br>
+<a href="#stunnel">stunnel</a><br>
+<a href="#taiclockd">taiclockd</a><br>
+<a href="#tmda-ofmipd">tmda-ofmipd</a><br>
+<a href="#tomcat">tomcat</a><br>
+<a href="#vsftpd">vsftpd</a><br>
+<a href="#wvdial">wvdial</a><br>
+<a href="#xdm">xdm</a><br>
+<hr>
+
+<h3><a name="atftpd">An <tt>atftpd</tt> run script</a></h3>
+(<i>Debian</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/sbin/in.tftpd --daemon --no-fork --tftpd-timeout 30 \
+   --retry-timeout 5 --no-tsize --no-blksize --no-multicast \
+   --maxthread 1000 --verbose=7 /var/atfpd 2&gt;&amp;1
+</pre>
+<hr>
+<h3><a name="apache">An <tt>apache</tt> run script</a></h3>
+(<i>SunOS</i>, Apache 1.*, patched to run under supervise)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec env -i \
+ /pack/apache/1.3.27-1/sbin/httpd -F 2&gt;&amp;1
+</pre>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec 1&gt;&amp;2
+ exec apache-ssl -F
+</pre>
+<hr>
+<h3><a name="apache2">An <tt>apache2</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec env -i /command/pgrphack \
+ /pack/apache/2.0.43-1/sbin/httpd -DFOREGROUND 2&gt;&amp;1
+</pre>
+(<i>HP-UX/GNU</i>, <i>Linux</i>)
+<pre>
+ #!/bin/sh
+ TZ=MET-1METDST
+ export TZ
+ exec /usr/local/apache2/bin/httpd -DNO_DETACH
+</pre>
+<hr>
+<h3><a name="bind9">A <tt>bind9</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ MEM="`head -1 ./env/MEM`"
+ CHROOT="`head -1 ./env/CHROOT`"
+ exec softlimit -m "${MEM}" \
+   named -u bind -t "${CHROOT}" -g 2&gt;&amp;1
+</pre>
+(<i>HP-UX/GNU</i>, <i>Linux</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/sbin/named -f -t /var/spool/named/ -u named
+</pre>
+<hr>
+<h3><a name="boa">A <tt>boa</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ ulimit -n 1024
+ exec /pack/boa/current/boa -c /pack/boa/current -d 2&gt;&amp;1
+</pre>
+<hr>
+<h3><a name="cfengine">A <tt>cfengine</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ /pack/cfengine/sbin/cfagent --file /pack/cfengine/etc/cfagent.conf \
+   -L -v -q exec sleep 3600
+</pre>
+<hr>
+<h3><a name="clamav">A <tt>clamd</tt> run script</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/local/bin/setuidgid clamav \
+   /usr/local/bin/softlimit -a 40000000 /usr/local/sbin/clamd
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="courier-imap">A <tt>courier-imap</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ PREFIX="/usr/lib/courier-imap"
+ exec envdir ./env \
+   tcpserver -v -R 0 143 \
+   $PREFIX/sbin/imaplogin \
+   $PREFIX/libexec/authlib/authshadow \
+   $PREFIX/libexec/authlib/authvchkpw \
+   $PREFIX/bin/imapd Maildir
+</pre>
+See also <a href="http://jonaspasche.de/courier-imap-daemontools.txt">
+this page</a>.
+<hr>
+<h3><a name="cups">A <tt>cups</tt> run script</a></h3>
+(<i>Debian woody</i>, a.bono)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/sbin/cupsd -f
+</pre>
+<hr>
+<h3><a name="dhclient">A <tt>dhclient</tt> run script</a></h3>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec dhclient -e -d -cf ./config -lf ./leases -pf ./pid eth1
+</pre>
+<hr>
+<h3><a name="dhcpcd">A <tt>dhcpcd</tt> run script</a></h3>
+(<i>Linux</i>, DHCP Client Daemon v.scriptconfig-0.1)
+<pre>
+ #!/bin/sh
+ dhcpcd -a -d -D -H eth0
+</pre>
+<hr>
+<h3><a name="dhcpd">A <tt>dhcpd</tt> run script</a></h3>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec dhcpd-2.2.x -f -d -cf ./config eth0
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<p>
+(<i>Solaris 8</i>, uses additional dsvclockd service, would get fired off
+automatically, but then it's not supervised)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /command/envdir ./env /usr/lib/inet/dsvclockd -f
+</pre>
+<pre>
+ #!/bin/sh
+ if /command/svok /service/dsvclockd; then
+   /usr/bin/sleep 2 # wait to make sure dsvclockd is initialized
+   exec 2&gt;&amp;1
+   exec /command/envdir ./env /usr/lib/inet/in.dhcpd -b manual -d # -v
+ fi
+ echo dsvclockd is not running - aborting
+ exec /usr/bin/sleep 5
+</pre>
+The in.dhcpd service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="expireproctitle">
+<tt>expireproctitle</tt> run script examples</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ echo -n .
+ exec sleep 300
+</pre>
+<hr>
+<h3><a name="fam">A <tt>fam</tt> run script</a></h3>
+(<i>Slackware Linux 9.0</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/bin/fam -L -f -v
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="gdm">A <tt>gdm</tt> run script</a></h3>
+<i>(Debian woody)</i>
+<pre>
+ #!/bin/sh
+ exec gdm -nodaemon
+</pre>
+<hr>
+<h3><a name="getty">A <tt>mingetty</tt> run script</a></h3>
+(<i>Debian</i>)
+<pre>
+ #!/bin/sh
+ exec mingetty tty5
+</pre>
+The <a href="index.html">runit</a> package does not care about utmp records
+for getties. You should choose a getty that handles its own utmp and wtmp
+records. Debian's <tt>mingetty</tt> does create his own utmp record.
+<h3>An <tt>agetty</tt> run script</h3>
+(<i>Slackware Linux 9.0</i>)
+<pre>
+ #!/bin/sh
+ exec /sbin/agetty 38400 tty1 linux
+</pre>
+<hr>
+<h3><a name="identd">An <tt>oidentd</tt> run script</a></h3>
+(<i>Linux</i>, oidentd version 2.0.6)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec oidentd -i -S -t 10 -u daemon -g daemon
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<p>
+(<i>Debian</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/local/sbin/oidentd --nosyslog -i -u ident -g ident -l 15 -m \
+   -C /etc/oidentd/oidentd.conf 2&gt;&amp;1
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="inn">An <tt>innd</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ MEM="`head -1 ./env/MEM`"
+ exec softlimit -m "${MEM}" \
+   setuidgid news \
+   /usr/sw/bin/news/inndstart -f -r
+</pre>
+<hr>
+<h3><a name="jabberd"><tt>jabberd</tt> run scripts</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ if [ -f /usr/local/jabber/jabber.pid ]; then
+   rm /usr/local/jabber/jabber.pid
+ fi
+ exec /usr/local/bin/setuidgid jabberd \
+   /usr/local/jabber/jabberd/jabberd -D -c /etc/jabber.xml
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ sleep 5 # so that jit starts after jabberd is up
+ exec /usr/local/bin/setuidgid jabberd \
+   /usr/local/jabber/jit/jabberd/jabberd -c /etc/jit.xml
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="klogd">A <tt>klogd</tt> run script</a></h3>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec /sbin/klogd -n
+</pre>
+<hr>
+<h3><a name="leafnode">A <tt>leafnode</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec envuidgid news \
+   tcpserver -v -x rules.cdb -c 10 -U 0 119 \
+   leafnode
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="loglinuxkernel">
+A run script for <tt>logging Linux kernel messages with multilog</tt></a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh -e
+ exec &lt; /proc/kmsg \
+ setuidgid loguser \
+ multilog t n64 ./main
+</pre>
+<hr>
+<h3><a name="minidentd">A <tt>minidentd</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec envuidgid nobody \
+   tcpserver -vUR 0 113 \
+   timeoutafter 60 \
+   minidentd -v
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="mysql">A <tt>mysql</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec setuidgid mysql /pack/mysql/current/libexec/mysqld \
+         --basedir=/pack/mysql/current \
+         --datadir=/pack/mysql/data/ \
+         --socket=/tmp/mysql.sock \
+         --pid-file=/pack/mysql/data/mysql.pid 2&gt;&amp;1
+</pre>
+(<i>Debian</i>, ``It's an ugly hack, but it works'')
+<pre>
+ #!/bin/sh
+ cd /
+ umask 077
+ 
+ MYSQLADMIN='/usr/bin/mysqladmin --defaults-extra-file=/etc/mysql/debian.cnf'
+ 
+ trap "$MYSQLADMIN shutdown" 0
+ trap 'exit 2' 1 2 3 15
+ 
+ /usr/bin/mysqld_safe &amp; wait
+</pre>
+<hr>
+<h3><a name="ntpd">A <tt>ntpd</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ MEM="`head -1 ./env/MEM`"
+ exec softlimit -m ${MEM} \
+   ntpd -n -p /var/run/ntpd.pid
+</pre>
+<hr>
+<h3><a name="polipo">A <tt>polipo</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec setuidgid polipo \
+   polipo -c config forbiddenFile="`pwd`"/forbidden diskCacheRoot="`pwd`"/cache
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="pop3-ssl">A <tt>pop3-ssl</tt> run script</a></h3>
+(<i>BSD</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/local/bin/tcpserver -R -v -c 50 0 995 /usr/local/sbin/stunnel
+ -f  -p /etc/ssl/stunnel.pem \
+ -l /var/qmail/bin/qmail-popup -- /var/qmail/bin/qmail-popup
+ "`cat /var/qmail/control/me`" vchkpw /var/qmail/bin/qmail-pop3d Maildir 2&gt;&amp;1
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="pop3vscan">A <tt>pop3vscan</tt> run script</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/local/bin/setuidgid pop3vscan /usr/sbin/pop3vscan -d
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="postgresql">A <tt>postgresql</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec setuidgid postgres /pack/postgresql/current/bin/postmaster \
+   -D /pack/postgresql/data 2&gt;&amp;1
+</pre>
+<hr>
+<h3><a name="ppp">A <tt>ppp</tt> run script</a></h3>
+(<i>FreeBSD</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ echo "ppp -ddial dsl "
+ exec /usr/sbin/ppp -unit0 -foreground dsl
+</pre>
+<h3>A <tt>pppd</tt> run script</h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec chpst -P pppd call isp nodetach
+</pre>
+<hr>
+<h3><a name="proftpd">A <tt>proftpd</tt> run script</a></h3>
+(<i>Linux</i>, ProFTPD Version 1.2.8rc1,
+configure it to use 'ErrorLog "/dev/stdout"')
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec proftpd -n -d 1
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="pure-ftpd">A <tt>pure-ftpd</tt> run script</a></h3>
+(<i>Debian woody</i>, a.bono)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/sbin/pure-ftpd -a 50 -E -l pam -u 100
+</pre>
+<hr>
+<h3><a name="radiusd">A <tt>radiusd</tt> run script</a></h3>
+(<i>Slackware Linux 9.0</i>, cistron radius 1.6.1)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec radiusd -f -y -z -lstdout
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="rsyncd">A <tt>rsyncd</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec softlimit -d 100000000 /usr/local/bin/tcpserver \
+   -x /pack/rsync/rsync.service/tcp.rsync.cdb -v -c 100 -U -H -l 0 -R \
+   1.2.3.4 873 nice -2 /pack/rsync/bin/rsync --daemon --no-detach \
+   --config /pack/rsync/etc/rsyncd.conf
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="samba">A <tt>smbd</tt> run script</a></h3>
+(<i>Linux</i>, samba
+<a href="http://www.grendel.net/handler/pub/samba-patches/">patched</a>
+to run supervised)
+<pre>
+ #!/bin/sh
+ PATH="/usr/local/samba/bin"
+ exec 2&gt;&amp;1
+ exec smbd -F -S -d3
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<h3>A <tt>nmbd</tt> run script</h3>
+(<i>Linux</i>, samba
+<a href="http://www.grendel.net/handler/pub/samba-patches/">patched</a>
+to run supervised)
+<pre>
+ #!/bin/sh
+ PATH="/usr/local/samba/bin"
+ exec 2&gt;&amp;1
+ exec nmbd -F -S -d1
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="shoutcast">A <tt>shoutcast</tt> run script</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/local/bin/setuidgid sc_serv \
+   /usr/local/sc_serv/bin/sc_serv /etc/sc_serv.conf
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="squid">A <tt>squid</tt> run script</a></h3>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec squid -f ./config -sN
+</pre>
+<hr>
+<h3><a name="sshd">A <tt>sshd</tt> run script</a></h3>
+(<i>Debian woody</i>, sshd version OpenSSH_2.9p2)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec sshd -D -e
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="sshdtcpserver">
+A <tt>sshd (under tcpserver)</tt> run script</a></h3>
+(<i>Linux</i>, sshd version OpenSSH_3.4p1)
+<pre>
+ #!/bin/sh -e
+ exec 2&gt;&amp;1
+ exec \
+ tcpserver -1vpdl0 -Xxtcp.cdb 0 ssh \
+ sshd -ief config
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="statd">A <tt>statd</tt> run script</a></h3>
+(<i>Debian woody</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ NEED_LOCKD=yes
+ if test -f /proc/ksyms; then
+   # We need to be conservative and run lockd,
+   # unless we can prove that it isn't required.
+   grep -q lockdctl /proc/ksyms || NEED_LOCKD=no
+ fi
+ if [ "$NEED_LOCKD" = yes ]; then
+   /sbin/rpc.lockd
+ fi
+ exec rpc.statd -F -d
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<h3><a name="mountd">A <tt>mountd</tt> run script</a></h3>
+(<i>Debian</i>)
+<pre>
+#!/bin/sh
+svwaitup /var/service/statd
+RPCNFSDCOUNT=8  # Number of servers to be started up by default
+RPCMOUNTDOPTS=
+
+trap '/usr/bin/killall -2 nfsd' 0
+trap 'exit 2' 1 2 3 15
+
+/usr/sbin/exportfs -r
+/usr/sbin/rpc.nfsd -- $RPCNFSDCOUNT
+/usr/bin/rpcinfo -u localhost nfs 3 &gt;/dev/null 2&gt;&amp;1 ||
+  RPCMOUNTDOPTS="$RPCMOUNTDOPTS --no-nfs-version 3"
+/usr/sbin/rpc.mountd -F $RPCMOUNTDOPTS
+</pre>
+<hr>
+<h3><a name="stunnel">A <tt>stunnel</tt> run script</a></h3>
+(<i>BSD</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/local/sbin/stunnel -f -d 1234 -r 25 -v3 -a /etc/ssl/mailcerts 2&gt;&amp;1
+</pre>
+<hr>
+<h3><a name="taiclockd">A <tt>taiclockd</tt> run script</a></h3>
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec setuidgid taiclock /usr/local/clockspeed/bin/taiclockd
+</pre>
+<hr>
+<h3><a name="tmda-ofmipd">A <tt>tmda-ofmipd</tt> run script</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec /usr/local/tmda/bin/tmda-ofmipd -f -d -R pop3 -p my.host.name:8025 2&gt;&amp;1
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="tomcat">A <tt>tomcat</tt> run script</a></h3>
+(<i>SunOS</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec \
+ setuidgid apache \
+ /pack/tomcat/current/bin/catalina.sh run
+</pre>
+<hr>
+<h3><a name="vsftpd">A <tt>vsftpd</tt> run script</a></h3>
+(<i>RedHat 7</i>)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec /usr/local/bin/tcpserver -c30 -Xv -llocalhost \
+   -x/etc/tcp.ftp.cdb -uvsftpd -gvsftpd 0 ftp \
+     softlimit -d300000 /var/vsftpd/bin/vsftpd
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="wvdial">A <tt>wvdial</tt> run script</a></h3>
+(<i>Slackware Linux 9.0</i>, the service should have a <tt>down</tt>
+file, use <tt>svc -o /service/wvdial</tt> to bring up a ppp connection)
+<pre>
+ #!/bin/sh
+ exec 2&gt;&amp;1
+ exec wvdial ISP
+</pre>
+This service needs a
+<a href="http://cr.yp.to/daemontools/faq/create.html#runlog">log service</a>
+to be set up.
+<hr>
+<h3><a name="xdm">A <tt>xdm</tt> run script</a></h3>
+(<i>Linux</i>)
+<pre>
+ #!/bin/sh
+ svwaitup -s 2 /service/vc-*
+ exec xdm -nodaemon
+</pre>
+<hr>
+<address><a href="mailto:pape-runscripts@smarden.org">
+Gerrit Pape &lt;pape@smarden.org&gt;
+</a></address>
+<small>$Id: runscripts.html,v 1.19 2003/12/30 18:13:59 pape Exp $</small>
+</body>
+</html>

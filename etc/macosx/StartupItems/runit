@@ -1,0 +1,21 @@
+#!/bin/sh
+
+##
+# runit
+##
+
+. /etc/rc.common
+
+StartService() {
+  ConsoleMessage "Starting runit service supervision"
+  /bin/csh -cf '/sbin/runsvdir-start &'
+}
+StopService() {
+  ConsoleMessage "Stopping runit service supervision"
+  svwaitdown -k -t34 /var/service/*
+}
+RestartService() {
+  return 0
+}
+
+RunService "$1"
