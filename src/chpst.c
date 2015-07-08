@@ -20,7 +20,7 @@
 #include "openreadclose.h"
 #include "direntry.h"
 
-#define USAGE_MAIN " [-vP012] [-u user[:group]] [-U user[:group]] [-e dir] [-l|-L lock] [-m n] [-o n] [-p n] [-f n] [-c n] prog"
+#define USAGE_MAIN " [-vP012] [-u user[:group]] [-U user[:group]] [-e dir] [-/ root] [-n nice] [-l|-L lock] [-m n] [-d n] [-o n] [-p n] [-f n] [-c n] prog"
 #define FATAL "chpst: fatal: "
 #define WARNING "chpst: warning: "
 
@@ -56,33 +56,48 @@ long limitf =-2;
 long limitc =-2;
 long limitr =-2;
 long limitt =-2;
+long nicelvl =0;
 const char *lock =0;
+const char *root =0;
 unsigned int lockdelay;
 
-void suidgid(char *user, unsigned int dogrp) {
+void suidgid(char *user, unsigned int ext) {
   struct uidgid ugid;
 
-  if (! uidgid_get(&ugid, user, dogrp)) {
-    if (dogrp)
+  if (ext) {
+    if (! uidgids_get(&ugid, user)) {
+      if (*user == ':') fatalx("invalid uid/gids", user +1);
+      if (errno) fatal("unable to get password/group file entry");
       fatalx("unknown user/group", user);
-    else
-      fatalx("unknown account", user);
+    }
   }
-  if (prot_gid(ugid.gid) == -1) fatal("unable to setgid");
+  else
+    if (! uidgid_get(&ugid, user)) {
+      if (errno) fatal("unable to get password file entry");
+      fatalx("unknown account", user);
+    }
+  if (setgroups(ugid.gids, ugid.gid) == -1) fatal("unable to setgroups");
+  if (setgid(*ugid.gid) == -1) fatal("unable to setgid");
   if (prot_uid(ugid.uid) == -1) fatal("unable to setuid");
 }
 
-void euidgid(char *user, unsigned int dogrp) {
+void euidgid(char *user, unsigned int ext) {
   struct uidgid ugid;
   char bufnum[FMT_ULONG];
 
-  if (! uidgid_get(&ugid, user, dogrp)) {
-    if (dogrp)
+  if (ext) {
+    if (! uidgids_get(&ugid, user)) {
+      if (*user == ':') fatalx("invalid uid/gids", user +1);
+      if (errno) fatal("unable to get password/group file entry");
       fatalx("unknown user/group", user);
-    else
-      fatalx("unknown account", user);
+    }
   }
-  bufnum[fmt_ulong(bufnum, ugid.gid)] =0;
+  else
+    if (! uidgid_get(&ugid, user)) {
+      if (errno) fatal("unable to get password file entry");
+      fatalx("unknown account", user);
+    }
+  bufnum[fmt_ulong(bufnum, *ugid.gid)] =0;
   if (! pathexec_env("GID", bufnum)) die_nomem();
   bufnum[fmt_ulong(bufnum, ugid.uid)] =0;
   if (! pathexec_env("UID", bufnum)) die_nomem();
@@ -95,7 +110,7 @@ void edir(const char *dirname) {
   int i;
 
   if (! (wdir =open_read(".")))
-    fatal("unable to open current working direcotry");
+    fatal("unable to open current working directory");
   if (chdir(dirname)) fatal2("unable to switch to directory", dirname);
   if (! (dir =opendir("."))) fatal2("unable to open directory", dirname);
   for (;;) {
@@ -106,13 +121,21 @@ void edir(const char *dirname) {
       break;
     }
     if (d->d_name[0] == '.') continue;
-    if (openreadclose(d->d_name, &sa, 256) == -1)
-      strerr_die6sys(111, FATAL, "unable to read ", dirname, "/",
-		     d->d_name, ": ");
+    if (openreadclose(d->d_name, &sa, 256) == -1) {
+      if ((errno == error_isdir) && env_dir) {
+        if (verbose)
+          strerr_warn6(WARNING, "unable to read ", dirname, "/",
+                       d->d_name, ": ", &strerr_sys);
+        continue;
+      }
+      else
+        strerr_die6sys(111, FATAL, "unable to read ", dirname, "/",
+                             d->d_name, ": ");
+    }
     if (sa.len) {
       sa.len =byte_chr(sa.s, sa.len, '\n');
       while (sa.len && (sa.s[sa.len -1] == ' ' || sa.s[sa.len -1] == '\t'))
-	--sa.len;
+        --sa.len;
       for (i =0; i < sa.len; ++i) if (! sa.s[i]) sa.s[i] ='\n';
       if (! stralloc_0(&sa)) die_nomem();
       if (! pathexec_env(d->d_name, sa.s)) die_nomem();
@@ -125,33 +148,32 @@ void edir(const char *dirname) {
   close(wdir);
 }
 
+void slock_die(const char *m, const char *f, unsigned int x) {
+  if (! x) fatal2(m, f);
+  _exit(0);
+}
 void slock(const char *f, unsigned int d, unsigned int x) {
   int fd;
-  void die(const char *m) {
-    if (! x) fatal2(m, f);
-    _exit(0);
-  }
 
-  if ((fd =open_append(f)) == -1) die("unable to open lock");
+  if ((fd =open_append(f)) == -1) slock_die("unable to open lock", f, x);
   if (d) {
-    if (lock_ex(fd) == -1) die("unable to lock");
+    if (lock_ex(fd) == -1) slock_die("unable to lock", f, x);
     return;
   }
-  if (lock_exnb(fd) == -1) die("unable to lock");
+  if (lock_exnb(fd) == -1) slock_die("unable to lock", f, x);
 }
 
+void limit(int what, long l) {
+  struct rlimit r;
+
+  if (getrlimit(what, &r) == -1) fatal("unable to getrlimit()");
+  if ((l < 0) || (l > r.rlim_max))
+    r.rlim_cur =r.rlim_max;
+  else
+    r.rlim_cur =l;
+  if (setrlimit(what, &r) == -1) fatal("unable to setrlimit()");
+}
 void slimit() {
-  void limit(int what, long l) {
-    struct rlimit r;
-
-    if (getrlimit(what, &r) == -1) fatal("unable to getrlimit()");
-    if ((l < 0) || (l > r.rlim_max))
-      r.rlim_cur =r.rlim_max;
-    else
-      r.rlim_cur =l;
-    if (setrlimit(what, &r) == -1) fatal("unable to setrlimit()");
-  }
-
   if (limitd >= -1) {
 #ifdef RLIMIT_DATA
     limit(RLIMIT_DATA, limitd);
@@ -245,6 +267,7 @@ void softlimit(int, const char *const *);
 int main(int argc, const char *const *argv) {
   int opt;
   int i;
+  unsigned long ul;
 
   progname =argv[0];
   for (i =str_len(progname); i; --i)
@@ -262,21 +285,36 @@ int main(int argc, const char *const *argv) {
   if (str_equal(progname, "setlock")) setlock(argc, argv);
   if (str_equal(progname, "softlimit")) softlimit(argc, argv);
 
-  while ((opt =getopt(argc, argv, "u:U:e:m:o:p:f:c:r:t:l:L:vP012V")) != opteof)
+  while ((opt =getopt(argc, argv, "u:U:e:m:d:o:p:f:c:r:t:/:n:l:L:vP012V"))
+         != opteof)
     switch(opt) {
     case 'u': set_user =(char*)optarg; break;
     case 'U': env_user =(char*)optarg; break;
     case 'e': env_dir =optarg; break;
     case 'm':
-      if (optarg[scan_ulong(optarg, &limitd)]) usage();
-      limits =limitl =limita =limitd;
+      if (optarg[scan_ulong(optarg, &ul)]) usage();
+      limits =limitl =limita =limitd =ul;
       break;
-    case 'o': if (optarg[scan_ulong(optarg, &limito)]) usage(); break;
-    case 'p': if (optarg[scan_ulong(optarg, &limitp)]) usage(); break;
-    case 'f': if (optarg[scan_ulong(optarg, &limitf)]) usage(); break;
-    case 'c': if (optarg[scan_ulong(optarg, &limitc)]) usage(); break;
-    case 'r': if (optarg[scan_ulong(optarg, &limitr)]) usage(); break;
-    case 't': if (optarg[scan_ulong(optarg, &limitt)]) usage(); break;
+    case 'd': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitd =ul; break;
+    case 'o': if (optarg[scan_ulong(optarg, &ul)]) usage(); limito =ul; break;
+    case 'p': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitp =ul; break;
+    case 'f': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitf =ul; break;
+    case 'c': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitc =ul; break;
+    case 'r': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitr =ul; break;
+    case 't': if (optarg[scan_ulong(optarg, &ul)]) usage(); limitt =ul; break;
+    case '/': root =optarg; break;
+    case 'n':
+      switch (*optarg) {
+        case '-':
+          if (optarg[scan_ulong(++optarg, &ul)]) usage(); nicelvl =ul;
+          nicelvl *=-1;
+          break;
+        case '+': ++optarg;
+        default:
+          if (optarg[scan_ulong(optarg, &ul)]) usage(); nicelvl =ul;
+          break;
+      }
+      break;
     case 'l': if (lock) usage(); lock =optarg; lockdelay =1; break;
     case 'L': if (lock) usage(); lock =optarg; lockdelay =0; break;
     case 'v': verbose =1; break;
@@ -284,7 +322,7 @@ int main(int argc, const char *const *argv) {
     case '0': nostdin =1; break;
     case '1': nostdout =1; break;
     case '2': nostderr =1; break;
-    case 'V': strerr_warn1("$Id: chpst.c,v 1.1 2003/08/05 20:41:19 pape Exp $", 0);
+    case 'V': strerr_warn1("$Id: 1bfc8e0a2f6eadcb47d4db127340f41be9ee3ed4 $", 0);
     case '?': usage();
     }
   argv +=optind;
@@ -292,14 +330,21 @@ int main(int argc, const char *const *argv) {
   
   if (pgrp) setsid();
   if (env_dir) edir(env_dir);
+  if (root) {
+    if (chdir(root) == -1) fatal2("unable to change directory", root);
+    if (chroot(".") == -1) fatal("unable to change root directory");
+  }
+  if (nicelvl) {
+    errno =0;
+    if (nice(nicelvl) == -1) if (errno) fatal("unable to set nice level");
+  }
   if (env_user) euidgid(env_user, 1);
   if (set_user) suidgid(set_user, 1);
-  slimit();
   if (lock) slock(lock, lockdelay, 0);
   if (nostdin) if (close(0) == -1) fatal("unable to close stdin");
   if (nostdout) if (close(1) == -1) fatal("unable to close stdout");
   if (nostderr) if (close(2) == -1) fatal("unable to close stderr");
-
+  slimit();
   pathexec(argv);
   fatal2("unable to run", *argv);
   return(0);
@@ -313,60 +358,63 @@ int main(int argc, const char *const *argv) {
 #define USAGE_SETLOCK " [ -nNxX ] file program [ arg ... ]"
 #define USAGE_SOFTLIMIT " [-a allbytes] [-c corebytes] [-d databytes] [-f filebytes] [-l lockbytes] [-m membytes] [-o openfiles] [-p processes] [-r residentbytes] [-s stackbytes] [-t cpusecs] child"
 
+void setuidgid_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_SETUIDGID, "\n");
+}
 void setuidgid(int argc, const char *const *argv) {
   const char *account;
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_SETUIDGID, "\n");
-  }
 
-  if (! (account =*++argv)) usage();
-  if (! *++argv) usage();
+  if (! (account =*++argv)) setuidgid_usage();
+  if (! *++argv) setuidgid_usage();
   suidgid((char*)account, 0);
   pathexec(argv);
   fatal2("unable to run", *argv);
 }
+
+void envuidgid_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_ENVUIDGID, "\n");
+}
 void envuidgid(int argc, const char *const *argv) {
   const char *account;
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_ENVUIDGID, "\n");
-  }
 
-  if (! (account =*++argv)) usage();
-  if (! *++argv) usage();
+  if (! (account =*++argv)) envuidgid_usage();
+  if (! *++argv) envuidgid_usage();
   euidgid((char*)account, 0);
   pathexec(argv);
   fatal2("unable to run", *argv);
 }
+
+void envdir_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_ENVDIR, "\n");
+}
 void envdir(int argc, const char *const *argv) {
   const char *dir;
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_ENVDIR, "\n");
-  }
 
-  if (! (dir =*++argv)) usage();
-  if (! *++argv) usage();
+  if (! (dir =*++argv)) envdir_usage();
+  if (! *++argv) envdir_usage();
   edir(dir);
   pathexec(argv);
   fatal2("unable to run", *argv);
 }
-void pgrphack(int argc, const char *const *argv) {
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_PGRPHACK, "\n");
-  }
 
-  if (! *++argv) usage();
+void pgrphack_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_PGRPHACK, "\n");
+}
+void pgrphack(int argc, const char *const *argv) {
+  if (! *++argv) pgrphack_usage();
   setsid();
   pathexec(argv);
   fatal2("unable to run", *argv);
+}
+
+void setlock_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_SETLOCK, "\n");
 }
 void setlock(int argc, const char *const *argv) {
   int opt;
   unsigned int delay =0;
   unsigned int x =0;
   const char *fn;
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_SETLOCK, "\n");
-  }
 
   while ((opt =getopt(argc, argv, "nNxX")) != opteof)
     switch(opt) {
@@ -374,30 +422,34 @@ void setlock(int argc, const char *const *argv) {
       case 'N': delay =0; break;
       case 'x': x =1; break;
       case 'X': x =0; break;
-      default: usage();
+      default: setlock_usage();
     }
   argv +=optind;
-  if (! (fn =*argv)) usage();
-  if (! *++argv) usage();
+  if (! (fn =*argv)) setlock_usage();
+  if (! *++argv) setlock_usage();
 
   slock(fn, delay, x);
   pathexec(argv);
   if (! x) fatal2("unable to run", *argv);
   _exit(0);
 }
+
+void softlimit_usage() {
+  strerr_die4x(100, "usage: ", progname, USAGE_SOFTLIMIT, "\n");
+}
+void getlarg(long *l) {
+  unsigned long ul;
+
+  if (str_equal(optarg, "=")) { *l =-1; return; }
+  if (optarg[scan_ulong(optarg, &ul)]) usage();
+  *l =ul;
+}
 void softlimit(int argc, const char *const *argv) {
   int opt;
-  void usage() {
-    strerr_die4x(100, "usage: ", progname, USAGE_SOFTLIMIT, "\n");
-  }
-  void getlarg(long *l) {
-    if (str_equal(optarg, "=")) *l =-1;
-    else if (optarg[scan_ulong(optarg, l)]) usage();
-  }
-
+  
   while ((opt =getopt(argc,argv,"a:c:d:f:l:m:o:p:r:s:t:")) != opteof)
     switch(opt) {
-    case '?': usage();
+    case '?': softlimit_usage();
     case 'a': getlarg(&limita); break;
     case 'c': getlarg(&limitc); break;
     case 'd': getlarg(&limitd); break;
@@ -411,7 +463,7 @@ void softlimit(int argc, const char *const *argv) {
     case 't': getlarg(&limitt); break;
     }
   argv +=optind;
-  if (!*argv) usage();
+  if (!*argv) softlimit_usage();
   slimit();
   pathexec(argv);
   fatal2("unable to run", *argv);

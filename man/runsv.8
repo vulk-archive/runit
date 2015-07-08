@@ -24,6 +24,17 @@ If ./run or ./finish exit immediately,
 .B runsv
 waits a second before starting ./finish or restarting ./run.
 .P
+Two arguments are given to ./finish.
+The first one is ./run's exit code, or -1 if ./run didn't exit normally.
+The second one is the least significant byte of the exit status as
+determined by
+.BR waitpid (2);
+for instance it is 0 if ./run exited normally, and the signal number
+if ./run was terminated by a signal.
+If
+.B runsv
+cannot start ./run for some reason, the exit code is 111 and the status is 0.
+.P
 If the file
 .IR service /down
 exists,
@@ -49,9 +60,10 @@ directory.
 The standard input of the log service is redirected to read from the pipe.
 .P
 .B runsv
-maintains status information in a binary format compatible to
-.BR supervise (8)
-in
+maintains status information in a binary format (compatible to the
+daemontools'
+.B supervise
+program) in
 .IR service /supervise/status
 and
 .IR service /log/supervise/status,
@@ -68,7 +80,7 @@ and (optionally)
 are provided to give commands to
 .BR runsv .
 You can use
-.BR runsvctrl (8)
+.BR sv (8)
 to control the service or just write one of the following characters to
 the named pipe:
 .TP
@@ -79,15 +91,14 @@ If the service stops, restart it.
 .TP
 .B d
 Down.
-If the service is running, send it a TERM signal.
+If the service is running, send it a TERM signal, and then a CONT signal.
 If ./run exits, start ./finish if it exists.
 After it stops, do not restart service.
 .TP
 .B o
 Once.
 If the service is not running, start it.
-Do not restart it if it
-stops.
+Do not restart it if it stops.
 .TP
 .B p
 Pause.
@@ -109,6 +120,10 @@ If the service is running, send it a ALRM signal.
 Interrupt.
 If the service is running, send it a INT signal.
 .TP
+.B q
+Quit.
+If the service is running, send it a QUIT signal.
+.TP
 .B 1
 User-defined 1.
 If the service is running, send it a USR1 signal.
@@ -125,9 +140,9 @@ If the service is running, send it a TERM signal.
 Kill.
 If the service is running, send it a KILL signal.
 .TP
-.B x \fRor \fBe
+.B x
 Exit.
-If the service is running, send it a TERM signal.
+If the service is running, send it a TERM signal, and then a CONT signal.
 Do not restart the service.
 If the service is down, and no log service exists,
 .B runsv
@@ -142,19 +157,45 @@ This command is ignored if it is given to
 .IR service /log/supervise/control.
 .P
 Example: to send a TERM signal to the socklog-unix service, either do
-  # runsvctrl term /var/service/socklog-unix
+  # sv term /service/socklog-unix
  or
-  # echo \-n t >/var/service/socklog-unix/supervise/control
+  # printf t >/service/socklog-unix/supervise/control
 .P
-If
-.BR echo (1)
-on your systems does not provide the \-n option, leave it out,
-.B runsv
-ignores unknown characters written to the control pipe.
-.BR echo (1)
+.BR printf (1)
 usually blocks if no
 .B runsv
 process is running in the service directory.
+.SH CUSTOMIZE CONTROL
+For each control character
+.I c
+sent to the control pipe,
+.B runsv
+first checks if
+.I service\fR/control/\fIc
+exists and is executable.
+If so, it starts
+.I service\fR/control/\fIc
+and waits for it to terminate, before interpreting the command.
+If the program exits with return code 0,
+.B runsv
+refrains from sending the service the corresponding signal.
+The command
+.I o
+is always considered as command
+.IR u .
+On command
+.I d
+first
+.I service\fR/control/t
+is checked, and then
+.I service\fR/control/d.
+On command
+.I x
+first
+.I service\fR/control/t
+is checked, and then
+.I service\fR/control/x.
+The control of the optional log service cannot be customized.
 .SH SIGNALS
 If
 .B runsv
@@ -170,15 +211,14 @@ is running in
 .B runsv
 exits 0 if it was told to exit.
 .SH SEE ALSO
-runsvctrl(8),
-runsvstat(8),
+sv(8),
+chpst(8),
+svlogd(8),
 runit(8),
 runit-init(8),
 runsvdir(8),
 runsvchdir(8),
-svlogd(8),
-svwaitdown(8),
-svwaitup(8),
+utmpset(8)
 .P
 http://smarden.org/runit/
 .SH AUTHOR

@@ -10,9 +10,15 @@ chpst \- runs a program with a changed process state
 .IR user ]
 [-e
 .IR dir ]
+[\-/
+.IR root ]
+[\-n
+.IR inc ]
 [-l|-L
 .IR lock ]
 [-m
+.IR bytes ]
+[-d
 .IR bytes ]
 [-o
 .IR n ]
@@ -32,36 +38,63 @@ changes the process state according to the given options, and runs
 .IR prog .
 .SH OPTIONS
 .TP
-.B \-u \fIuser[:group]
+.B \-u \fI[:]user[:group]
 setuidgid.
 Set uid and gid to the
 .IR user 's
-uid and gid.
+uid and gid, as found in
+.IR /etc/passwd .
 If
 .I user
 is followed by a colon and a
 .IR group ,
 set the gid to
 .IR group 's
-gid instead of
+gid, as found in
+.IR /etc/group ,
+instead of
 .IR user 's
 gid.
-All supplementary groups are removed.
+If
+.I group
+consists of a colon-separated list of group names,
+.B chpst
+sets the group ids of all listed groups.
+If
+.I user
+is prefixed with a colon, the
+.I user
+and all
+.I group
+arguments are interpreted as uid and gids respectivly, and not looked up in
+the password or group file.
+All initial supplementary groups are removed.
 .TP
-.B \-U \fIuser[:group]
+.B \-U \fI[:]user[:group]
 envuidgid.
 Set the environment variables $UID and $GID to the
 .IR user 's
-uid and gid.
+uid and gid, as found in
+.IR /etc/passwd .
 If
 .I user
 is followed by a colon and a
 .IR group ,
 set $GID to the
 .IR group 's
-gid instead of
+gid, as found in
+.IR /etc/group ,
+instead of
 .IR user 's
 gid.
+If
+.I user
+is prefixed with a colon, the
+.I user
+and
+.I group
+arguments are interpreted as uid and gid respectivly, and not looked up in
+the password or group file.
 .TP
 .B \-e \fIdir
 envdir.
@@ -96,6 +129,24 @@ removes the environment variable
 .I k
 if it exists, without adding a new variable.
 .TP
+.B \-/ \fIroot
+chroot.
+Change the root directory to
+.I root
+before starting
+.IR prog .
+.TP
+.B \-n \fIinc
+nice.
+Add
+.I inc
+to the
+.BR nice (2)
+value before starting
+.IR prog .
+.I inc
+must be an integer, and may start with a minus or plus.
+.TP
 .B \-l \fIlock
 lock.
 Open the file
@@ -118,6 +169,12 @@ Limit the data segment, stack segment, locked physical pages, and total of
 all segment per process to
 .I bytes
 bytes each.
+.TP
+.B \-d \fIbytes
+limit data segment.
+Limit the data segment per process to
+.I bytes
+bytes.
 .TP
 .B \-o \fIn
 limit open files.
@@ -143,7 +200,8 @@ bytes.
 .TP
 .B \-v
 verbose.
-Print warnings about limits unsupported by the system to standard error.
+Print verbose messages to standard error.
+This includes warnings about limits unsupported by the system.
 .TP
 .B \-P
 pgrphack.
@@ -152,15 +210,15 @@ Run
 in a new process group.
 .TP
 .B \-0
-Close standard input before running
+Close standard input before starting
 .IR prog .
 .TP
 .B \-1
-Close standard output before running
+Close standard output before starting
 .IR prog .
 .TP
 .B \-2
-Close standard error before running
+Close standard error before starting
 .IR prog .
 .SH EXIT CODES
 .B chpst
@@ -173,21 +231,23 @@ Otherwise its exit code is the same as that of
 If
 .B chpst
 is called as
-.BR envdir (8),
-.BR envuidgid (8),
-.BR pgrphack (8),
-.BR setlock (8),
-.BR setuidgid (8),
+.BR envdir ,
+.BR envuidgid ,
+.BR pgrphack ,
+.BR setlock ,
+.BR setuidgid ,
 or
-.BR softlimit (8),
+.BR softlimit ,
 it emulates the functionality of these programs from the daemontools package
 respectively.
 .SH SEE ALSO
+sv(8),
 runsv(8),
-runsvctrl(8),
-runsvstat(8),
+setsid(2),
+runit(8),
+runit-init(8),
 runsvdir(8),
-setsid(2)
+runsvchdir(8)
 .P
  http://smarden.org/runit/
  http://cr.yp.to/daemontools.html

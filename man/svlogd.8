@@ -3,11 +3,11 @@
 svlogd \- runit's service logging daemon
 .SH SYNOPSIS
 .B svlogd
-[\-ttv] [\-r
+[\-tttv] [\-r
 .I c\fR] [\-R
 .I xyz\fR] [\-l
-.I n\fR] [\-b
-.I n\fR]
+.I len\fR] [\-b
+.I buflen\fR]
 .I logs
 .SH DESCRIPTION
 .I logs
@@ -21,7 +21,8 @@ messages, and writes the data to one or more automatically rotated
 Recent log files can automatically be processed by an arbitrary processor
 program when they are rotated, and
 .B svlogd
-can be told to alert selected log messages to standard error.
+can be told to alert selected log messages to standard error, and through
+udp.
 .P
 .B svlogd
 runs until it sees end-of-file on standard input or is sent a TERM signal,
@@ -33,9 +34,9 @@ contains some number of old log files, and the current log file
 .IR current .
 Old log files have a file name starting with
 .I @
-followed by a precise timestamp (see
-.BR tai64n (8)),
-indicating when
+followed by a precise timestamp (see the daemontools'
+.B tai64n
+program), indicating when
 .I current
 was rotated and renamed to this file.
 .P
@@ -68,11 +69,12 @@ If
 .I current
 has
 .I size
-bytes or more size (or there is a new-line within the last
+bytes or more (or there is a new-line within the last
 .I len
 of
 .I size
-bytes)
+bytes), or is older than a specified amount of
+.IR time ,
 .I current
 is rotated:
 .P
@@ -91,9 +93,13 @@ If
 .B svlogd
 sees
 .I num
-or more old log files in
-.IR dir ,
-it removes the oldest.
+or more old log files in the log directory, it removes the oldest one.
+Note that this doesn't decrease the number of log files if there are
+already more than
+.I num
+log files, this must be done manually, e.g. for keeping 10 log files:
+.P
+ ls \-1 \\@* |sort |sed \-ne '10,$p' |xargs rm
 .SS PROCESSOR
 If
 .B svlogd
@@ -109,12 +115,12 @@ and writes the output to
 If the
 .I processor
 finishes successfully,
-.RI @ timestamp\fR.u
-is deleted and
 .RI @ timestamp\fR.t
 is renamed to
 .RI @ timestamp\fR.s,
-otherwise
+and
+.RI @ timestamp\fR.u
+is deleted; otherwise
 .RI @ timestamp\fR.t
 is deleted and the
 .I processor
@@ -122,8 +128,8 @@ is started again.
 .B svlogd
 also saves any output that the
 .I processor
-writes to file descriptor 5, and make that output available on
-file descriptor 4 when it runs
+writes to file descriptor 5, and makes that output available on file
+descriptor 4 when running
 .I processor
 on the next log file rotation.
 .P
@@ -146,7 +152,7 @@ Note that this may block any program feeding its log data to
 .SS CONFIG
 On startup, and after receiving a HUP signal,
 .B svlogd
-checks for each
+checks for each log directory
 .I log
 if the configuration file
 .I log/config
@@ -154,8 +160,7 @@ exists, and if so, reads the file line by line and adjusts configuration for
 .I log
 as follows:
 .P
-If the line is empty, less than two characters long, or starts with a ``#'',
-it is ignored.
+If the line is empty, or starts with a ``#'', it is ignored.
 A line of the form
 .TP
 .RI s size
@@ -178,7 +183,7 @@ to at least (2 *
 .IR len ).
 .TP
 .RI n num
-sets the maximum number of old log files
+sets the number of old log files
 .B svlogd
 should maintain to
 .IR num .
@@ -190,6 +195,45 @@ old log files in
 .I log
 after log file rotation, it deletes the oldest one.
 Default is 10.
+If
+.I num
+is zero,
+.B svlogd
+doesn't remove old log files.
+.TP
+.RI N min
+sets the minimum number of old log files
+.B svlogd
+should maintain to
+.IR min .
+.I min
+must be less than
+.IR num .
+If
+.I min
+is set, and
+.B svlogd
+cannot write to
+.I current
+because the filesystem is full, and it sees more than
+.I min
+old log files, it deletes the oldest one.
+.TP
+.RI t timeout
+sets the maximum age of the
+.I current
+log file when
+.B svlogd
+should rotate the current log file to
+.I timeout
+seconds.
+If
+.I current
+is
+.I timeout
+seconds old, and is not empty,
+.B svlogd
+forces log file rotation.
 .TP
 .RI ! processor
 tells
@@ -229,6 +273,13 @@ but transmitted through udp only.
 Error messages from
 .B svlogd
 concerning sending udp packages still go to the log directory.
+.TP
+.RI p prefix
+tells
+.B svlogd
+to prefix each line to be written to the log directory, to standard error,
+or through UDP, with
+.IR prefix .
 .P
 If a line starts with a
 .IR \- ,
@@ -247,21 +298,20 @@ and acts accordingly:
 the log message is deselected.
 .TP
 .RI + pattern
-the log message is selected
+the log message is selected.
 .TP
 .RI e pattern
-log messages matching
-.I pattern
-are printed to standard error.
+the log message is selected to be printed to standard error.
 .TP
 .RI E pattern
-log messages not matching
-.I pattern
-are printed to standard error.
+the log message is deselected to be printed to standard error.
 .P
-Initially each line is selected.
+Initially each line is selected to be written to
+.IR log/current .
 Deselected log messages are discarded from
 .IR log .
+Initially each line is deselected to be written to standard err.
+Log messages selected for standard error are written to standard error.
 .SH PATTERN MATCHING
 .B svlogd
 matches a log message against the string
@@ -282,20 +332,48 @@ character in
 A star at the end of
 .I pattern
 matches any string.
+.P
+Timestamps optionally added by
+.B svlogd
+are not considered part of the log message.
+.P
+An
+.B svlogd
+pattern is not a regular expression.
+For example consider a log message like this
+.P
+ 2005-12-18_09:13:50.97618 tcpsvd: info: pid 1977 from 10.4.1.14
+.P
+The following pattern doesn't match
+.P
+ -*pid*
+.P
+because the first star matches up to the first p in tcpsvd, and then the
+match fails because i is not s.
+To match this log message, you can use a pattern like this instead
+.P
+ -*: *: pid *
 .SH OPTIONS
 .TP
 .B \-t
 timestamp.
-Prefix each selected line with a precise timestamp (see
-.BR tai64n (8))
-when writing to
+Prefix each selected line with a precise timestamp (see the daemontools'
+.B tai64n
+program) when writing to
 .I log
 or to standard error.
 .TP
 .B \-tt
 timestamp.
-Prefix each selected line with a human readable, sortable timestamp of the
-form YYYY-MM-DD_HH:MM:SS.xxxxx when writing to
+Prefix each selected line with a human readable, sortable UTC timestamp of
+the form YYYY-MM-DD_HH:MM:SS.xxxxx when writing to
+.I log
+or to standard error.
+.TP
+.B \-ttt
+timestamp.
+Prefix each selected line with a human readable, sortable UTC timestamp of
+the form YYYY-MM-DDTHH:MM:SS.xxxxx when writing to
 .I log
 or to standard error.
 .TP
@@ -334,6 +412,10 @@ Default is 1024.
 .I buflen
 must be greater than
 .IR len .
+For
+.B svlogd
+instances that process a lot of data in short time, the buffer size should
+be increased to improve performance.
 .TP
 .B \-v
 verbose.
@@ -369,14 +451,13 @@ with a non empty
 .I current
 log file.
 .SH SEE ALSO
+sv(8),
 runsv(8),
-runsvstat(8),
-runsvctrl(8),
-runsvdir(8),
-runsvchdir(8),
+chpst(8),
 runit(8),
 runit-init(8),
-multilog(8)
+runsvdir(8),
+runsvchdir(8)
 .P
 http://smarden.org/runit/
 .SH AUTHOR

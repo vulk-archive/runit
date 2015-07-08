@@ -13,18 +13,18 @@
 <a href="http://cr.yp.to/slashpackage.html">/package</a>.
 If you don't have a <tt>/package</tt> directory, create it now:
 <pre>
-  # mkdir -p /package
-  # chmod 1755 /package
+ # mkdir -p /package
+ # chmod 1755 /package
 </pre>
 Download
-<a href="runit-1.0.0.tar.gz">runit-1.0.0.tar.gz</a> into <tt>/package</tt>
+<a href="runit-2.0.0.tar.gz">runit-2.0.0.tar.gz</a> into <tt>/package</tt>
 and unpack the archive
 <pre>
-  # cd /package
-  # gunzip runit-1.0.0.tar
-  # tar -xpf runit-1.0.0.tar
-  # rm runit-1.0.0.tar
-  # cd admin/runit-1.0.0
+ # cd /package
+ # gunzip runit-2.0.0.tar
+ # tar -xpf runit-2.0.0.tar
+ # rm runit-2.0.0.tar
+ # cd admin/runit-2.0.0
 </pre>
 On MacOSX, do
 <pre>
@@ -34,17 +34,20 @@ On MacOSX, do
 </pre>
 Now compile and install the <i>runit</i> programs
 <pre>
-  # package/install
+ # package/install
 </pre>
 If you want to make the man pages available in the <tt>/usr/local/man/</tt>
 hierarchy, do:
 <pre>
-  # package/install-man
+ # package/install-man
 </pre>
 To report success:
 <pre>
-  # mail pape-runit-1.0.0@smarden.org &lt;compile/sysdeps
+ # mail pape-runit-2.0.0@smarden.org &lt;compile/sysdeps
 </pre>
+If you use <i>runit</i> regularly, please
+<a href="http://smarden.org/pape/#contribution">contribute</a> to the project.
+<p>
 Refer to <a href="replaceinit.html">replacing init</a> for
 replacing <i>init</i> with <i>runit</i>, or to
 <a href="useinit.html">use with traditional init</a> for running
@@ -54,6 +57,5 @@ scheme.
 <address><a href="mailto:pape@smarden.org">
 Gerrit Pape &lt;pape@smarden.org&gt;
 </a></address>
-<small>$Id: install.html,v 1.47 2004/02/10 13:11:07 pape Exp $</small>
 </body>
 </html>
