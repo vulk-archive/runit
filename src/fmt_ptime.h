@@ -10,5 +10,6 @@
 extern unsigned int fmt_ptime(char *, struct taia *);
 extern unsigned int fmt_ptime_iso8601(char *, struct taia *);
 extern unsigned int fmt_taia(char *, struct taia *);
+extern unsigned int fmt_taia_monotonic(char *s, struct taia *t);
 
 #endif

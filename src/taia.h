@@ -14,6 +14,7 @@ struct taia {
 extern void taia_tai(const struct taia *,struct tai *);
 
 extern void taia_now(struct taia *);
+extern void monotonic_now(struct taia *t);
 
 extern double taia_approx(const struct taia *);
 extern double taia_frac(const struct taia *);

@@ -9,6 +9,7 @@ struct tai {
   uint64 x;
 } ;
 
+//0x400000000000000aULL = 4611686018427387914ULL
 #define tai_unix(t,u) ((void) ((t)->x = 4611686018427387914ULL + (uint64) (u)))
 
 extern void tai_now(struct tai *);

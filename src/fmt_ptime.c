@@ -40,3 +40,9 @@ unsigned int fmt_taia(char *s, struct taia *t) {
   }
   return(25);
 }
+
+unsigned int fmt_taia_monotonic(char *s, struct taia *t) {
+  fmt_taia(s, t);
+  s[0] ='%';
+  return(25);
+}

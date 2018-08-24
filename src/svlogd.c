@@ -97,6 +97,8 @@ struct logdir {
 } *dir;
 unsigned int dirn =0;
 
+unsigned int use_monotonic_clock =0;
+
 void usage() { strerr_die4x(111, "usage: ", progname, USAGE, "\n"); }
 void die_nomem() { strerr_die2x(111, FATAL, "out of memory."); }
 void fatal(char *m0) { strerr_die3sys(111, FATAL, m0, ": "); }
@@ -266,12 +268,20 @@ unsigned int rotate(struct logdir *ld) {
   else
     ld->fnsave[26] ='s';
   ld->fnsave[27] =0;
+
+  //here we are sampling time and waiting for such value that coresponding file name does not exist
   do {
-    taia_now(&now);
-    fmt_taia(ld->fnsave, &now);
+    if(use_monotonic_clock){
+      monotonic_now(&now);
+      fmt_taia_monotonic(ld->fnsave, &now);
+    }else{
+      taia_now(&now);
+      fmt_taia(ld->fnsave, &now);
+    }
     errno =0;
   } while ((stat(ld->fnsave, &st) != -1) || (errno != error_noent));
 
+  //check if max log file time is configured and is passed
   if (ld->tmax && taia_less(&ld->trotate, &now)) {
     taia_uint(&ld->trotate, ld->tmax);
     taia_add(&ld->trotate, &now, &ld->trotate);
@@ -524,8 +534,13 @@ unsigned int logdir_open(struct logdir *ld, const char *fn) {
     if (st.st_size && ! (st.st_mode & S_IXUSR)) {
       ld->fnsave[25] ='.'; ld->fnsave[26] ='u'; ld->fnsave[27] =0;
       do {
-        taia_now(&now);
-        fmt_taia(ld->fnsave, &now);
+        if(use_monotonic_clock){
+          monotonic_now(&now);
+          fmt_taia_monotonic(ld->fnsave, &now);
+        }else{
+          taia_now(&now);
+          fmt_taia(ld->fnsave, &now);
+        }
         errno =0;
       } while ((stat(ld->fnsave, &st) != -1) || (errno != error_noent));
       while (rename("current", ld->fnsave) == -1)
@@ -566,7 +581,11 @@ void logdirs_reopen(void) {
   int ok =0;
 
   tmaxflag =0;
-  taia_now(&now);
+  if(use_monotonic_clock){
+    monotonic_now(&now);
+  }else{
+    taia_now(&now);
+  }
   for (l =0; l < dirn; ++l) {
     logdir_close(&dir[l]);    
     if (logdir_open(&dir[l], fndir[l])) ok =1;
@@ -590,7 +609,11 @@ int buffer_pread(int fd, char *s, unsigned int len) {
     logdirs_reopen();
     reopenasap =0;
   }
-  taia_now(&now);
+  if(use_monotonic_clock){
+    monotonic_now(&now);
+  }else{
+    taia_now(&now);
+  }
   taia_uint(&trotate, 2744);
   taia_add(&trotate, &now, &trotate);
   for (i =0; i < dirn; ++i)
@@ -666,8 +689,7 @@ int main(int argc, const char **argv) {
   int opt;
 
   progname =*argv;
-
-  while ((opt =getopt(argc, argv, "R:r:l:b:tvV")) != opteof) {
+  while ((opt =getopt(argc, argv, "R:r:l:b:mtvV")) != opteof) {
     switch(opt) {
     case 'R':
       replace =optarg;
@@ -688,6 +710,9 @@ int main(int argc, const char **argv) {
     case 't':
       if (++timestamp > 3) timestamp =3;
       break;
+    case 'm':
+      use_monotonic_clock = 1;
+      break;
     case 'v':
       ++verbose;
       break;
@@ -696,7 +721,10 @@ int main(int argc, const char **argv) {
     }
   }
   argv +=optind;
-
+  if( use_monotonic_clock && timestamp > 1)
+  {
+    fatal("monotonic clock cannot be used with options tt or ttt");
+  }
   dirn =argc -optind;
   if (dirn <= 0) usage();
   if (buflen <= linemax) usage();
@@ -742,11 +770,18 @@ int main(int argc, const char **argv) {
         break;
       }
       if (! linelen && timestamp) {
-        taia_now(&now);
         switch (timestamp) {
-        case 1: fmt_taia(stamp, &now); break;
-        case 2: fmt_ptime(stamp, &now); break;
-        case 3: fmt_ptime_iso8601(stamp, &now); break;
+        case 1: 
+          if(use_monotonic_clock){
+            monotonic_now(&now);
+            fmt_taia_monotonic(stamp, &now);
+          }else{
+            taia_now(&now);
+            fmt_taia(stamp, &now);
+          } 
+          break;
+        case 2: taia_now(&now); fmt_ptime(stamp, &now); break;
+        case 3: taia_now(&now); fmt_ptime_iso8601(stamp, &now); break;
         }
         stamp[25] =' '; stamp[26] =0;
       }

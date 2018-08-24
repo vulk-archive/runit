@@ -13,3 +13,12 @@ void taia_now(struct taia *t)
   t->nano = 1000 * now.tv_usec + 500;
   t->atto = 0;
 }
+
+void monotonic_now(struct taia *t)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  t->sec.x = ts.tv_sec;
+  t->nano = ts.tv_nsec;
+  t->atto = 0;
+}
