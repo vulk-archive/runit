@@ -231,7 +231,7 @@ void rmoldest(struct logdir *ld) {
     pause2("unable to open directory, want rotate", ld->name);
   errno =0;
   while ((f =readdir(d)))
-    if ((f->d_name[0] == '@') && (str_len(f->d_name) == 27)) {
+    if ((f->d_name[0] == use_monotonic_clock ? '%' : '@') && (str_len(f->d_name) == 27)) {
       if (f->d_name[26] == 't') {
         if (unlink(f->d_name) == -1)
           warn2("unable to unlink processor leftover", f->d_name);
@@ -247,7 +247,7 @@ void rmoldest(struct logdir *ld) {
 
   if (ld->nmax && (n > ld->nmax)) {
     if (verbose) strerr_warn5(INFO, "delete: ", ld->name, "/", oldest, 0);
-    if ((*oldest == '@') && (unlink(oldest) == -1))
+    if ((*oldest == use_monotonic_clock ? '%' : '@') && (unlink(oldest) == -1))
       warn2("unable to unlink oldest logfile", ld->name);
   }
 }
@@ -341,7 +341,7 @@ int buffer_pwrite(int n, char *s, unsigned int len) {
                (dir +n)->name);
       errno =0;
       while ((f =readdir(d)))
-        if ((f->d_name[0] == '@') && (str_len(f->d_name) == 27)) {
+        if ((f->d_name[0] == use_monotonic_clock ? '%' : '@') && (str_len(f->d_name) == 27)) {
           ++j;
           if (str_diff(f->d_name, oldest) < 0)
             byte_copy(oldest, 27, f->d_name);
@@ -351,7 +351,7 @@ int buffer_pwrite(int n, char *s, unsigned int len) {
       closedir(d);
       errno =ENOSPC;
       if (j > (dir +n)->nmin)
-        if (*oldest == '@') {
+        if (*oldest == use_monotonic_clock ? '%' : '@') {
           strerr_warn5(WARNING, "out of disk space, delete: ", (dir +n)->name,
                        "/", oldest, 0);
           errno =0;
